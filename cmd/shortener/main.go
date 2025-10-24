@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -11,14 +13,20 @@ import (
 
 var storage map[string]string = map[string]string{}
 
+var server string
+
 func main() {
+
+	flag.StringVar(&server, "a", "localhost:8080", "server address and port")
+	flag.Parse()
 
 	r := chi.NewRouter()
 
 	r.Get("/{linkid}", getLinkHandler)
 	r.Post("/", putLinkHandler)
 
-	http.ListenAndServe(":8080", r)
+	fmt.Printf("server: %v\n", server)
+	http.ListenAndServe(server, r)
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +93,7 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	storage[link] = string(bs)
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("http://localhost:8080/" + link))
+
+	fmt.Fprintf(w, "http://%s/%s", server, link)
 
 }
