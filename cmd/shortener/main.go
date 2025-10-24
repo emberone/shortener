@@ -15,7 +15,7 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Get("/", getLinkHandler)
+	r.Get("/{linkid}", getLinkHandler)
 	r.Post("/", putLinkHandler)
 
 	http.ListenAndServe(":8080", r)
@@ -35,12 +35,15 @@ func getLinkHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	}
 
-	if _, ok := storage[r.URL.Path[1:]]; !ok {
-		w.WriteHeader(http.StatusNotFound)
+	link := chi.URLParam(r, "linkid")
 
+	if _, ok := storage[link]; ok && len(link) != 0 {
+		w.Header().Set("Location", storage[link])
+		w.WriteHeader(http.StatusTemporaryRedirect)
+		return
 	}
 
-	w.Write([]byte(storage[r.URL.Path[1:]]))
+	w.WriteHeader(http.StatusNotFound)
 
 }
 
@@ -82,5 +85,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	storage[link] = string(bs)
 
 	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("http://localhost:8080/" + link))
 
 }
