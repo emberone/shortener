@@ -86,17 +86,15 @@ func putLink(r *http.Request) (string, error) {
 
 	storage[link] = string(bs)
 
-	fmt.Printf("storage: %v\n", storage)
-
 	return link, nil
 
 }
 
 func getLink(r *http.Request) (string, error) {
 
-	if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
-		return "", errors.New("Content-Type is not text/plain")
-	}
+	// if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
+	// 	return "", errors.New("Content-Type is not text/plain")
+	// }
 
 	if len(r.URL.Path) == 0 {
 		return "", errors.New("no url path has been provided")
@@ -106,8 +104,6 @@ func getLink(r *http.Request) (string, error) {
 		fmt.Printf("r.URL.Path[1:]: %v\n", r.URL.Path[1:])
 		return "", errors.New("not found in storage")
 	}
-
-	fmt.Printf("storage[r.URL.Path[1:]]: %v\n", storage[r.URL.Path[1:]])
 
 	return storage[r.URL.Path[1:]], nil
 }
