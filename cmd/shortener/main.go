@@ -1,72 +1,67 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 var storage map[string]string = map[string]string{}
 
 func main() {
 
-	http.HandleFunc("/", mainPage)
+	r := chi.NewRouter()
 
-	http.ListenAndServe(":8080", nil)
+	r.Get("/", getLinkHandler)
+	r.Post("/", putLinkHandler)
+
+	http.ListenAndServe(":8080", r)
 }
 
-func mainPage(w http.ResponseWriter, r *http.Request) {
+func getLinkHandler(w http.ResponseWriter, r *http.Request) {
 
-	switch r.Method {
-	case http.MethodPost:
-		var link string
-		var err error
+	// if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
+	// 	return "", errors.New("Content-Type is not text/plain")
+	// }
 
-		if link, err = putLink(r); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Printf("err: %v\n", err)
-			return
-		}
-
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://localhost:8080/" + link))
-
-	case http.MethodGet:
-
-		var link string
-		var err error
-
-		if link, err = getLink(r); err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Printf("err: %v\n", err)
-			return
-		}
-
-		w.Header().Set("Location", link)
-		w.WriteHeader(http.StatusTemporaryRedirect)
-
-	default:
+	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
+	if len(r.URL.Path) == 0 {
+		w.WriteHeader(http.StatusForbidden)
+	}
+
+	if _, ok := storage[r.URL.Path[1:]]; !ok {
+		w.WriteHeader(http.StatusNotFound)
+
+	}
+
+	w.Write([]byte(storage[r.URL.Path[1:]]))
+
 }
 
-func putLink(r *http.Request) (string, error) {
+func putLinkHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
 
 	if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
-		return "", errors.New("Content-Type is not text/plain")
+		w.WriteHeader(http.StatusBadRequest)
 	}
 
 	bs, err := io.ReadAll(r.Body)
 	if err != nil {
-		return "", err
+		w.WriteHeader(http.StatusForbidden)
 	}
 
 	if len(bs) == 0 {
-		return "", errors.New("body is empty")
+		w.WriteHeader(http.StatusForbidden)
+
 	}
 
 	var link string
@@ -86,24 +81,6 @@ func putLink(r *http.Request) (string, error) {
 
 	storage[link] = string(bs)
 
-	return link, nil
+	w.WriteHeader(http.StatusCreated)
 
-}
-
-func getLink(r *http.Request) (string, error) {
-
-	// if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
-	// 	return "", errors.New("Content-Type is not text/plain")
-	// }
-
-	if len(r.URL.Path) == 0 {
-		return "", errors.New("no url path has been provided")
-	}
-
-	if _, ok := storage[r.URL.Path[1:]]; !ok {
-		fmt.Printf("r.URL.Path[1:]: %v\n", r.URL.Path[1:])
-		return "", errors.New("not found in storage")
-	}
-
-	return storage[r.URL.Path[1:]], nil
 }
