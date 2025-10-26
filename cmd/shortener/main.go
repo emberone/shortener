@@ -22,7 +22,7 @@ var basePath string
 func main() {
 
 	flag.StringVar(&server, "a", "localhost:8080", "server address and port")
-	flag.StringVar(&basePath, "b", "http://localhost:8080/api", "server address and port")
+	flag.StringVar(&basePath, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
 
 	flags := map[string]bool{}
@@ -45,6 +45,7 @@ func main() {
 		path = "/"
 	}
 
+	fmt.Printf("path: %v\n", path)
 	r := chi.NewRouter()
 
 	r.Route(path, func(r chi.Router) {
