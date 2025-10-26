@@ -16,13 +16,17 @@ import (
 
 var storage map[string]string = map[string]string{}
 
-var server string
-var basePath string
+var server struct {
+	aFlag string
+	bFlag string
+	path  string
+	host  string
+}
 
 func main() {
 
-	flag.StringVar(&server, "a", "localhost:8080", "server address and port")
-	flag.StringVar(&basePath, "b", "http://localhost:8080/", "server address and port")
+	flag.StringVar(&server.aFlag, "a", "localhost:8080", "server address and port")
+	flag.StringVar(&server.bFlag, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
 
 	flags := map[string]bool{}
@@ -38,29 +42,30 @@ func main() {
 		}
 	}()
 
-	parsedURL, _ := url.Parse(basePath)
-	path := parsedURL.Path
+	if flags["a"] {
 
-	if parsedURL.Path == "" {
-		path = "/"
+		server.host = server.aFlag
+		server.path = "/"
 	}
 
-	fmt.Printf("path: %v\n", path)
-	r := chi.NewRouter()
+	if flags["b"] {
+		parsedURL, _ := url.Parse(server.bFlag)
+		if parsedURL.Path == "" {
+			server.path = "/"
+		} else {
+			server.path = parsedURL.Path
+		}
 
-	r.Route(path, func(r chi.Router) {
+		server.host = parsedURL.Host
+	}
+
+	r := chi.NewRouter()
+	r.Route(server.path, func(r chi.Router) {
 		r.Get("/{linkid}", getLinkHandler)
 		r.Post("/", putLinkHandler)
 	})
 
-	if flags["a"] {
-		http.ListenAndServe(server, r)
-	}
-	if flags["b"] {
-		http.ListenAndServe(parsedURL.Host, r)
-	}
-
-	http.ListenAndServe(server, r)
+	log.Fatal(http.ListenAndServe(server.host, r))
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +133,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	fmt.Fprintf(w, "http://%s/%s", server, link)
+	fmt.Fprintf(w, "http://%s%s", server.host+server.path+"/", link)
 
 }
