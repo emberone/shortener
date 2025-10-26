@@ -4,8 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,18 +17,48 @@ import (
 var storage map[string]string = map[string]string{}
 
 var server string
+var basePath string
 
 func main() {
 
 	flag.StringVar(&server, "a", "localhost:8080", "server address and port")
+	flag.StringVar(&basePath, "b", "http://localhost:8080/api", "server address and port")
 	flag.Parse()
+
+	flags := map[string]bool{}
+	func() {
+
+		flag.Visit(func(f *flag.Flag) {
+			flags[f.Name] = true
+		})
+
+		if flags["a"] && flags["b"] {
+			log.Println("can't use both flags -a and -b")
+			os.Exit(1)
+		}
+	}()
+
+	parsedURL, _ := url.Parse(basePath)
+	path := parsedURL.Path
+
+	if parsedURL.Path == "" {
+		path = "/"
+	}
 
 	r := chi.NewRouter()
 
-	r.Get("/{linkid}", getLinkHandler)
-	r.Post("/", putLinkHandler)
+	r.Route(path, func(r chi.Router) {
+		r.Get("/{linkid}", getLinkHandler)
+		r.Post("/", putLinkHandler)
+	})
 
-	fmt.Printf("server: %v\n", server)
+	if flags["a"] {
+		http.ListenAndServe(server, r)
+	}
+	if flags["b"] {
+		http.ListenAndServe(parsedURL.Host, r)
+	}
+
 	http.ListenAndServe(server, r)
 }
 
