@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -26,6 +27,10 @@ func main() {
 	flag.StringVar(&server.aFlag, "a", "localhost:8080", "server address and port")
 	flag.StringVar(&server.bFlag, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
+
+	p, _ := url.Parse(server.bFlag)
+	server.path = p.Path
+	fmt.Printf("server.path: %v\n", server.path)
 
 	r := chi.NewRouter()
 	r.Route(server.path, func(r chi.Router) {
@@ -101,6 +106,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	fmt.Fprintf(w, "%s/%s", server.bFlag, link)
+	fmt.Fprintf(w, "%s%s", server.bFlag, link)
 
 }
