@@ -32,6 +32,9 @@ func main() {
 	server.path = p.Path
 	fmt.Printf("server.path: %v\n", server.path)
 
+	if server.path == "" {
+		server.path = "/"
+	}
 	r := chi.NewRouter()
 	r.Route(server.path, func(r chi.Router) {
 		r.Get("/{linkid}", getLinkHandler)
@@ -106,6 +109,9 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	fmt.Fprintf(w, "%s%s", server.bFlag, link)
-
+	if server.path == "/" {
+		fmt.Fprintf(w, "%s%s", server.bFlag, link)
+	} else {
+		fmt.Fprintf(w, "%s%s", server.bFlag+"/", link)
+	}
 }
