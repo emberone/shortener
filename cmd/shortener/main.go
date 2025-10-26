@@ -109,9 +109,13 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	if server.path == "/" {
-		fmt.Fprintf(w, "%s%s", server.bFlag, link)
-	} else {
+	switch server.path {
+	case "":
+		fmt.Fprintf(w, "%s/%s", server.bFlag, link)
+	case "/":
+		fmt.Fprintf(w, "%s/%s", server.bFlag, link)
+	default:
 		fmt.Fprintf(w, "%s%s", server.bFlag+"/", link)
+
 	}
 }
