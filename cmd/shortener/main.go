@@ -42,11 +42,8 @@ func main() {
 		}
 	}()
 
-	if flags["a"] {
-
-		server.host = server.aFlag
-		server.path = "/"
-	}
+	server.path = "/"
+	server.host = server.aFlag
 
 	if flags["b"] {
 		parsedURL, _ := url.Parse(server.bFlag)
@@ -65,6 +62,7 @@ func main() {
 		r.Post("/", putLinkHandler)
 	})
 
+	fmt.Printf("server: %v\n", server.host)
 	log.Fatal(http.ListenAndServe(server.host, r))
 }
 
