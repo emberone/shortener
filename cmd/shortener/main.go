@@ -7,8 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
-	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,41 +27,13 @@ func main() {
 	flag.StringVar(&server.bFlag, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
 
-	flags := map[string]bool{}
-	func() {
-
-		flag.Visit(func(f *flag.Flag) {
-			flags[f.Name] = true
-		})
-
-		if flags["a"] && flags["b"] {
-			log.Println("can't use both flags -a and -b")
-			os.Exit(1)
-		}
-	}()
-
-	server.path = "/"
-	server.host = server.aFlag
-
-	if flags["b"] {
-		parsedURL, _ := url.Parse(server.bFlag)
-		if parsedURL.Path == "" {
-			server.path = "/"
-		} else {
-			server.path = parsedURL.Path
-		}
-
-		server.host = parsedURL.Host
-	}
-
 	r := chi.NewRouter()
 	r.Route(server.path, func(r chi.Router) {
 		r.Get("/{linkid}", getLinkHandler)
 		r.Post("/", putLinkHandler)
 	})
 
-	fmt.Printf("server: %v\n", server.host)
-	log.Fatal(http.ListenAndServe(server.host, r))
+	log.Fatal(http.ListenAndServe(server.aFlag, r))
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
@@ -131,12 +101,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	if server.path == "/" {
-		fmt.Fprintf(w, "http://%s%s", server.host+server.path, link)
-
-	} else {
-		fmt.Fprintf(w, "http://%s%s", server.host+server.path+"/", link)
-
-	}
+	fmt.Fprintf(w, "%s/%s", server.bFlag, link)
 
 }
