@@ -17,10 +17,11 @@ import (
 var storage map[string]string = map[string]string{}
 
 var server struct {
-	aFlag string
-	bFlag string
-	path  string
-	host  string
+	aFlag  string
+	bFlag  string
+	path   string
+	host   string
+	scheme string
 }
 
 func main() {
@@ -35,6 +36,9 @@ func main() {
 	if server.path == "" {
 		server.path = "/"
 	}
+	server.host = p.Host
+	server.scheme = p.Scheme
+
 	r := chi.NewRouter()
 	r.Route(server.path, func(r chi.Router) {
 		r.Get("/{linkid}", getLinkHandler)
@@ -115,12 +119,10 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	switch server.path {
-	case "":
-		fmt.Fprintf(w, "%s/%s", server.bFlag, link)
 	case "/":
-		fmt.Fprintf(w, "%s%s", server.bFlag, link)
+		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path, link)
 	default:
-		fmt.Fprintf(w, "%s%s", server.bFlag+"/", link)
+		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
 
 	}
 }
