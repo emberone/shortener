@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"mime"
 	"net/http"
 	"net/url"
 	"time"
@@ -30,7 +31,6 @@ func main() {
 
 	p, _ := url.Parse(server.bFlag)
 	server.path = p.Path
-	fmt.Printf("server.path: %v\n", server.path)
 
 	if server.path == "" {
 		server.path = "/"
@@ -76,8 +76,13 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 
-	if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
-		w.WriteHeader(http.StatusBadRequest)
+	if _, ok := r.Header["Content-Type"]; !ok {
+
+		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || mt != "text/plain" {
+			w.WriteHeader(http.StatusBadRequest)
+
+		}
 	}
 
 	bs, err := io.ReadAll(r.Body)
@@ -113,7 +118,7 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	case "":
 		fmt.Fprintf(w, "%s/%s", server.bFlag, link)
 	case "/":
-		fmt.Fprintf(w, "%s/%s", server.bFlag, link)
+		fmt.Fprintf(w, "%s%s", server.bFlag, link)
 	default:
 		fmt.Fprintf(w, "%s%s", server.bFlag+"/", link)
 
