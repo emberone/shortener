@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -78,24 +79,25 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 
-	if _, ok := r.Header["Content-Type"]; !ok {
+	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mt != "text/plain" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 
-		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || mt != "text/plain" {
-			w.WriteHeader(http.StatusBadRequest)
-
-		}
 	}
 
 	bs, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusForbidden)
+		return
 	}
 
 	if len(bs) == 0 {
 		w.WriteHeader(http.StatusForbidden)
+		return
 
 	}
 
@@ -114,7 +116,11 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
+	var mu sync.RWMutex
+
+	mu.Lock()
 	storage[link] = string(bs)
+	mu.Unlock()
 
 	w.WriteHeader(http.StatusCreated)
 
