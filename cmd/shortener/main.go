@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -18,8 +19,8 @@ import (
 var storage map[string]string = map[string]string{}
 
 var server struct {
-	aFlag  string
-	bFlag  string
+	a      string
+	b      string
 	path   string
 	host   string
 	scheme string
@@ -27,11 +28,18 @@ var server struct {
 
 func main() {
 
-	flag.StringVar(&server.aFlag, "a", "localhost:8080", "server address and port")
-	flag.StringVar(&server.bFlag, "b", "http://localhost:8080/", "server address and port")
+	flag.StringVar(&server.a, "a", "localhost:8080", "server address and port")
+	flag.StringVar(&server.b, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
 
-	p, _ := url.Parse(server.bFlag)
+	if a := os.Getenv("SERVER_ADDRESS"); a != "" {
+		server.a = a
+	}
+	if b := os.Getenv("SERVER_bDDRESS"); b != "" {
+		server.b = b
+	}
+
+	p, _ := url.Parse(server.b)
 	server.path = p.Path
 
 	if server.path == "" {
@@ -46,7 +54,7 @@ func main() {
 		r.Post("/", putLinkHandler)
 	})
 
-	log.Fatal(http.ListenAndServe(server.aFlag, r))
+	log.Fatal(http.ListenAndServe(server.a, r))
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
