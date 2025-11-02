@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
 var storage map[string]string = map[string]string{}
@@ -24,6 +25,13 @@ var server struct {
 	path   string
 	host   string
 	scheme string
+}
+
+var sugar zap.SugaredLogger
+
+type responseWriterWrapper struct {
+	http.ResponseWriter
+	statusCode int
 }
 
 func main() {
@@ -48,13 +56,69 @@ func main() {
 	server.host = p.Host
 	server.scheme = p.Scheme
 
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		// вызываем панику, если ошибка
+		panic(err)
+	}
+	defer logger.Sync()
+
+	sugar = *logger.Sugar()
+
 	r := chi.NewRouter()
+	r.Use(WithLogging)
+
 	r.Route(server.path, func(r chi.Router) {
 		r.Get("/{linkid}", getLinkHandler)
 		r.Post("/", putLinkHandler)
 	})
 
+	r.Route("/yo", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("yo"))
+		})
+
+	})
+
 	log.Fatal(http.ListenAndServe(server.a, r))
+}
+
+func WithLogging(h http.Handler) http.Handler {
+	logFn := func(w http.ResponseWriter, r *http.Request) {
+		// функция Now() возвращает текущее время
+		start := time.Now()
+
+		// эндпоинт /ping
+		uri := r.RequestURI
+		// метод запроса
+		method := r.Method
+
+		wrappedWriter := &responseWriterWrapper{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK, // default status code
+		}
+
+		// точка, где выполняется хендлер pingHandler
+		h.ServeHTTP(wrappedWriter, r) // обслуживание оригинального запроса
+
+		status := wrappedWriter.statusCode
+
+		// Since возвращает разницу во времени между start
+		// и моментом вызова Since. Таким образом можно посчитать
+		// время выполнения запроса.
+		duration := time.Since(start)
+
+		// отправляем сведения о запросе в zap
+		sugar.Infoln(
+			"status", status,
+			"uri", uri,
+			"method", method,
+			"duration", duration,
+		)
+
+	}
+	// возвращаем функционально расширенный хендлер
+	return http.HandlerFunc(logFn)
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
