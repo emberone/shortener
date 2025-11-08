@@ -35,8 +35,12 @@ type responseWriterWrapper struct {
 	statusCode int
 }
 
-type raw struct {
+type request struct {
 	URL string `json:"url"`
+}
+
+type response struct {
+	URL string `json:"result"`
 }
 
 func main() {
@@ -218,7 +222,7 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	var req raw
+	var req request
 
 	json.NewDecoder(r.Body).Decode(&req)
 
@@ -244,7 +248,7 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	storage[link] = string(req.URL)
 	mu.Unlock()
 
-	var resp raw
+	var resp response
 
 	switch server.path {
 	case "/":
