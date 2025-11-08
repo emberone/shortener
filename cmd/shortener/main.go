@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"flag"
@@ -20,6 +21,14 @@ import (
 	"go.uber.org/zap"
 )
 
+type request struct {
+	URL string `json:"url"`
+}
+
+type response struct {
+	URL string `json:"result"`
+}
+
 var storage map[string]string = map[string]string{}
 
 var server struct {
@@ -34,15 +43,22 @@ var sugar zap.SugaredLogger
 
 type responseWriterWrapper struct {
 	http.ResponseWriter
-	statusCode  int
-	wroteHeader bool
-	body        []byte
+	statusCode      int
+	wroteHeader     bool
+	body            *bytes.Buffer
+	isGzipped       bool
+	contentEncoding string
 }
 
 func (w *responseWriterWrapper) WriteHeader(statusCode int) {
 	if !w.wroteHeader {
 		w.statusCode = statusCode
 		w.wroteHeader = true
+
+		// Check if response will be gzipped
+		w.contentEncoding = w.Header().Get("Content-Encoding")
+		w.isGzipped = w.contentEncoding == "gzip"
+
 		w.ResponseWriter.WriteHeader(statusCode)
 	}
 }
@@ -52,20 +68,31 @@ func (w *responseWriterWrapper) Write(b []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	w.body = append(w.body, b...)
+	// Write to our buffer
+	w.body.Write(b)
+
+	// Write to the original response writer
 	return w.ResponseWriter.Write(b)
 }
 
 func (w *responseWriterWrapper) GetBody() string {
-	return string(w.body)
-}
+	if !w.isGzipped {
+		return w.body.String()
+	}
 
-type request struct {
-	URL string `json:"url"`
-}
+	// Decompress gzipped body for logging
+	reader, err := gzip.NewReader(w.body)
+	if err != nil {
+		return fmt.Sprintf("[gzip decompression error: %v]", err)
+	}
+	defer reader.Close()
 
-type response struct {
-	URL string `json:"result"`
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Sprintf("[gzip read error: %v]", err)
+	}
+
+	return string(decompressed)
 }
 
 type gzipWriter struct {
@@ -74,12 +101,10 @@ type gzipWriter struct {
 }
 
 func (w gzipWriter) Write(b []byte) (int, error) {
-	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
 	return w.Writer.Write(b)
 }
 
 func main() {
-
 	flag.StringVar(&server.a, "a", "localhost:8080", "server address and port")
 	flag.StringVar(&server.b, "b", "http://localhost:8080/", "server address and port")
 	flag.Parse()
@@ -102,7 +127,6 @@ func main() {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		// вызываем панику, если ошибка
 		panic(err)
 	}
 	defer logger.Sync()
@@ -124,114 +148,103 @@ func main() {
 
 func WithLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
-		// функция Now() возвращает текущее время
 		start := time.Now()
-
-		// эндпоинт /ping
 		uri := r.RequestURI
-		// метод запроса
 		method := r.Method
 
 		wrappedWriter := &responseWriterWrapper{
 			ResponseWriter: w,
-			statusCode:     http.StatusOK, // default status code
-			body:           []byte{},
+			statusCode:     http.StatusOK,
+			body:           &bytes.Buffer{},
 		}
 
-		// точка, где выполняется хендлер pingHandler
-		h.ServeHTTP(wrappedWriter, r) // обслуживание оригинального запроса
+		h.ServeHTTP(wrappedWriter, r)
 
-		// Since возвращает разницу во времени между start
-		// и моментом вызова Since. Таким образом можно посчитать
-		// время выполнения запроса.
 		duration := time.Since(start)
-
 		body := wrappedWriter.GetBody()
 
-		// отправляем сведения о запросе в zap
+		// Truncate long responses for cleaner logs
+		if len(body) > 1000 {
+			body = body[:1000] + "...[truncated]"
+		}
+
 		sugar.Infoln(
 			"status", wrappedWriter.statusCode,
 			"uri", uri,
 			"method", method,
+			"content_encoding", wrappedWriter.contentEncoding,
+			"response_size", wrappedWriter.body.Len(),
+			"decompressed_size", len(body),
 			"body", body,
 			"duration", duration,
 		)
-
 	}
-	// возвращаем функционально расширенный хендлер
 	return http.HandlerFunc(logFn)
 }
 
 func gzipHandle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// проверяем, что клиент поддерживает gzip-сжатие
-		// это упрощённый пример. В реальном приложении следует проверять все
-		// значения r.Header.Values("Accept-Encoding") и разбирать строку
-		// на составные части, чтобы избежать неожиданных результатов
-		fmt.Printf("r: %v\n", r)
-
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			// если gzip не поддерживается, передаём управление
-			// дальше без изменений
-			fmt.Printf("r.Header.Get(\"Accept-Encoding\"): %v\n", r.Header.Get("Accept-Encoding"))
-			next.ServeHTTP(w, r)
-			return
+		// Handle incoming gzip requests
+		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+			gz, err := gzip.NewReader(r.Body)
+			if err != nil {
+				http.Error(w, "Invalid gzip body", http.StatusBadRequest)
+				return
+			}
+			defer gz.Close()
+			r.Body = gz
 		}
 
-		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil {
-			next.ServeHTTP(w, r)
-			return
+		// Handle outgoing gzip responses
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			// Check if we should compress this response
+			// For now, let's compress text-based responses
+			contentType := w.Header().Get("Content-Type")
+			shouldCompress := strings.Contains(contentType, "text/") ||
+				strings.Contains(contentType, "application/json") ||
+				strings.Contains(contentType, "application/javascript")
 
-		}
-		if !(mt == "application/json" || mt == "text/html") {
-			fmt.Printf("mt: %v\n", mt)
-			next.ServeHTTP(w, r)
-			return
+			if shouldCompress {
+				gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+				if err != nil {
+					io.WriteString(w, err.Error())
+					return
+				}
+				defer gz.Close()
+
+				w.Header().Set("Content-Encoding", "gzip")
+				next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+				return
+			}
 		}
 
-		// создаём gzip.Writer поверх текущего w
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
-		defer gz.Close()
-
-		w.Header().Set("Content-Encoding", "gzip")
-		// передаём обработчику страницы переменную типа gzipWriter для вывода данных
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+		next.ServeHTTP(w, r)
 	})
 }
 
 func getLinkHandler(w http.ResponseWriter, r *http.Request) {
-
-	// if h, ok := r.Header["Content-Type"]; !ok || h[0] != "text/plain" {
-	// 	return "", errors.New("Content-Type is not text/plain")
-	// }
-
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 
 	if len(r.URL.Path) == 0 {
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	link := chi.URLParam(r, "linkid")
 
-	if _, ok := storage[link]; ok && len(link) != 0 {
-		w.Header().Set("Location", storage[link])
+	if storedURL, ok := storage[link]; ok && len(link) != 0 {
+		w.Header().Set("Location", storedURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 		return
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-
 }
 
 func putLinkHandler(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -241,27 +254,22 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil || mt != "text/plain" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-
 	}
 
 	bs, err := io.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if len(bs) == 0 {
-		w.WriteHeader(http.StatusForbidden)
+		w.WriteHeader(http.StatusBadRequest)
 		return
-
 	}
 
 	var link string
 	func() {
-
-		seed := rand.New(
-			rand.NewSource(time.Now().UnixNano()))
-
+		seed := rand.New(rand.NewSource(time.Now().UnixNano()))
 		charset := "abcdefghijklmnopqrstuvwxyz" +
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		b := make([]byte, 8)
@@ -272,7 +280,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	var mu sync.RWMutex
-
 	mu.Lock()
 	storage[link] = string(bs)
 	mu.Unlock()
@@ -284,7 +291,6 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path, link)
 	default:
 		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
-
 	}
 }
 
@@ -298,20 +304,17 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil || mt != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-
 	}
 
 	var req request
-
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	var link string
-
 	func() {
-
-		seed := rand.New(
-			rand.NewSource(time.Now().UnixNano()))
-
+		seed := rand.New(rand.NewSource(time.Now().UnixNano()))
 		charset := "abcdefghijklmnopqrstuvwxyz" +
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 		b := make([]byte, 8)
@@ -322,24 +325,19 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	var mu sync.RWMutex
-
 	mu.Lock()
-	storage[link] = string(req.URL)
+	storage[link] = req.URL
 	mu.Unlock()
 
 	var resp response
-
 	switch server.path {
 	case "/":
 		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path, link)
 	default:
 		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
-
 	}
 
-	w.Header().Add("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
 	json.NewEncoder(w).Encode(&resp)
-
 }
