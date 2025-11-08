@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -28,15 +29,23 @@ type request struct {
 type response struct {
 	URL string `json:"result"`
 }
+type fileType struct {
+	Uuid         string `json:"uuid"`
+	Short_url    string `json:"short_url"`
+	Original_url string `json:"original_url"`
+}
+
+type fileSliceType []fileType
 
 var storage map[string]string = map[string]string{}
 
 var server struct {
-	a      string
-	b      string
-	path   string
-	host   string
-	scheme string
+	a       string
+	b       string
+	path    string
+	host    string
+	scheme  string
+	storage string
 }
 
 var sugar zap.SugaredLogger
@@ -55,7 +64,6 @@ func (w *responseWriterWrapper) WriteHeader(statusCode int) {
 		w.statusCode = statusCode
 		w.wroteHeader = true
 
-		// Check if response will be gzipped
 		w.contentEncoding = w.Header().Get("Content-Encoding")
 		w.isGzipped = w.contentEncoding == "gzip"
 
@@ -68,10 +76,8 @@ func (w *responseWriterWrapper) Write(b []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	// Write to our buffer
 	w.body.Write(b)
 
-	// Write to the original response writer
 	return w.ResponseWriter.Write(b)
 }
 
@@ -80,7 +86,6 @@ func (w *responseWriterWrapper) GetBody() string {
 		return w.body.String()
 	}
 
-	// Decompress gzipped body for logging
 	reader, err := gzip.NewReader(w.body)
 	if err != nil {
 		return fmt.Sprintf("[gzip decompression error: %v]", err)
@@ -107,13 +112,17 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 func main() {
 	flag.StringVar(&server.a, "a", "localhost:8080", "server address and port")
 	flag.StringVar(&server.b, "b", "http://localhost:8080/", "server address and port")
+	flag.StringVar(&server.storage, "f", "storage.db", "storage")
 	flag.Parse()
 
 	if a := os.Getenv("SERVER_ADDRESS"); a != "" {
 		server.a = a
 	}
-	if b := os.Getenv("SERVER_bDDRESS"); b != "" {
+	if b := os.Getenv("SERVER_ADDRESS"); b != "" {
 		server.b = b
+	}
+	if f := os.Getenv("FILE_STORAGE_PATH"); f != "" {
+		server.storage = f
 	}
 
 	p, _ := url.Parse(server.b)
@@ -163,7 +172,6 @@ func WithLogging(h http.Handler) http.Handler {
 		duration := time.Since(start)
 		body := wrappedWriter.GetBody()
 
-		// Truncate long responses for cleaner logs
 		if len(body) > 1000 {
 			body = body[:1000] + "...[truncated]"
 		}
@@ -184,7 +192,6 @@ func WithLogging(h http.Handler) http.Handler {
 
 func gzipHandle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Handle incoming gzip requests
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			gz, err := gzip.NewReader(r.Body)
 			if err != nil {
@@ -195,10 +202,7 @@ func gzipHandle(next http.Handler) http.Handler {
 			r.Body = gz
 		}
 
-		// Handle outgoing gzip responses
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			// Check if we should compress this response
-			// For now, let's compress text-based responses
 			contentType := w.Header().Get("Content-Type")
 			shouldCompress := strings.Contains(contentType, "text/") ||
 				strings.Contains(contentType, "application/json") ||
@@ -336,6 +340,29 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
 	}
+
+	f, err := os.OpenFile(server.storage, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+	fmt.Printf("err: %v\n", err)
+
+	defer f.Close()
+
+	ft := fileType{
+		Uuid:         uuid.New().String(),
+		Short_url:    link,
+		Original_url: resp.URL,
+	}
+
+	//var buf bytes.Buffer
+
+	var fst fileSliceType
+
+	fst = append(fst, ft)
+	err = json.NewEncoder(f).Encode(fst)
+	//bs, err := json.Marshal(&ft)
+	//fmt.Printf("bs: %v\n", bs)
+	fmt.Printf("err: %v\n", err)
+
+	fmt.Printf("err: %v\n", err)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
