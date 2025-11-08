@@ -211,6 +211,13 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mt != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+
+	}
+
 	var req raw
 
 	json.NewDecoder(r.Body).Decode(&req)
@@ -247,6 +254,7 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
 	json.NewEncoder(w).Encode(&resp)
