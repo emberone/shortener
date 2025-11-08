@@ -36,6 +36,7 @@ type responseWriterWrapper struct {
 	http.ResponseWriter
 	statusCode  int
 	wroteHeader bool
+	body        []byte
 }
 
 func (w *responseWriterWrapper) WriteHeader(statusCode int) {
@@ -50,7 +51,13 @@ func (w *responseWriterWrapper) Write(b []byte) (int, error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
+
+	w.body = append(w.body, b...)
 	return w.ResponseWriter.Write(b)
+}
+
+func (w *responseWriterWrapper) GetBody() string {
+	return string(w.body)
 }
 
 type request struct {
@@ -128,6 +135,7 @@ func WithLogging(h http.Handler) http.Handler {
 		wrappedWriter := &responseWriterWrapper{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK, // default status code
+			body:           []byte{},
 		}
 
 		// точка, где выполняется хендлер pingHandler
@@ -138,11 +146,14 @@ func WithLogging(h http.Handler) http.Handler {
 		// время выполнения запроса.
 		duration := time.Since(start)
 
+		body := wrappedWriter.GetBody()
+
 		// отправляем сведения о запросе в zap
 		sugar.Infoln(
 			"status", wrappedWriter.statusCode,
 			"uri", uri,
 			"method", method,
+			"body", body,
 			"duration", duration,
 		)
 
