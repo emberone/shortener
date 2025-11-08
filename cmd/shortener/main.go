@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -32,6 +33,10 @@ var sugar zap.SugaredLogger
 type responseWriterWrapper struct {
 	http.ResponseWriter
 	statusCode int
+}
+
+type raw struct {
+	URL string `json:"url"`
 }
 
 func main() {
@@ -73,12 +78,7 @@ func main() {
 		r.Post("/", putLinkHandler)
 	})
 
-	r.Route("/yo", func(r chi.Router) {
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("yo"))
-		})
-
-	})
+	r.Post("/api/shorten", putLinkApiHandler)
 
 	log.Fatal(http.ListenAndServe(server.a, r))
 }
@@ -203,4 +203,52 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
 
 	}
+}
+
+func putLinkApiHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req raw
+
+	json.NewDecoder(r.Body).Decode(&req)
+
+	var link string
+
+	func() {
+
+		seed := rand.New(
+			rand.NewSource(time.Now().UnixNano()))
+
+		charset := "abcdefghijklmnopqrstuvwxyz" +
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+		b := make([]byte, 8)
+		for i := range b {
+			b[i] = charset[seed.Intn(len(charset))]
+		}
+		link = string(b)
+	}()
+
+	var mu sync.RWMutex
+
+	mu.Lock()
+	storage[link] = string(req.URL)
+	mu.Unlock()
+
+	var resp raw
+
+	switch server.path {
+	case "/":
+		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path, link)
+	default:
+		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
+
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+	json.NewEncoder(w).Encode(&resp)
+
 }
