@@ -78,7 +78,7 @@ func main() {
 		r.Post("/", putLinkHandler)
 	})
 
-	r.Post("/api/shorten", putLinkApiHandler)
+	r.Post("/api/shorten", putLinkAPIHandler)
 
 	log.Fatal(http.ListenAndServe(server.a, r))
 }
@@ -205,7 +205,7 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func putLinkApiHandler(w http.ResponseWriter, r *http.Request) {
+func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
