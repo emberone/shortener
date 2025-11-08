@@ -151,10 +151,14 @@ func gzipHandle(next http.Handler) http.Handler {
 		}
 
 		mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || (mt != "application/json" && mt != "text/html") {
+		if err != nil {
 			next.ServeHTTP(w, r)
 			return
 
+		}
+		if !(mt == "application/json" || mt == "text/html") {
+			next.ServeHTTP(w, r)
+			return
 		}
 
 		// создаём gzip.Writer поверх текущего w
