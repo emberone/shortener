@@ -34,7 +34,23 @@ var sugar zap.SugaredLogger
 
 type responseWriterWrapper struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
+}
+
+func (w *responseWriterWrapper) WriteHeader(statusCode int) {
+	if !w.wroteHeader {
+		w.statusCode = statusCode
+		w.wroteHeader = true
+		w.ResponseWriter.WriteHeader(statusCode)
+	}
+}
+
+func (w *responseWriterWrapper) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
 }
 
 type request struct {
@@ -117,8 +133,6 @@ func WithLogging(h http.Handler) http.Handler {
 		// точка, где выполняется хендлер pingHandler
 		h.ServeHTTP(wrappedWriter, r) // обслуживание оригинального запроса
 
-		status := wrappedWriter.statusCode
-
 		// Since возвращает разницу во времени между start
 		// и моментом вызова Since. Таким образом можно посчитать
 		// время выполнения запроса.
@@ -126,7 +140,7 @@ func WithLogging(h http.Handler) http.Handler {
 
 		// отправляем сведения о запросе в zap
 		sugar.Infoln(
-			"status", status,
+			"status", wrappedWriter.statusCode,
 			"uri", uri,
 			"method", method,
 			"duration", duration,
@@ -146,6 +160,7 @@ func gzipHandle(next http.Handler) http.Handler {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			// если gzip не поддерживается, передаём управление
 			// дальше без изменений
+			fmt.Printf("r.Header.Get(\"Accept-Encoding\"): %v\n", r.Header.Get("Accept-Encoding"))
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -157,6 +172,7 @@ func gzipHandle(next http.Handler) http.Handler {
 
 		}
 		if !(mt == "application/json" || mt == "text/html") {
+			fmt.Printf("mt: %v\n", mt)
 			next.ServeHTTP(w, r)
 			return
 		}
