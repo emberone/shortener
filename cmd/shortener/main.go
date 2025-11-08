@@ -168,6 +168,8 @@ func gzipHandle(next http.Handler) http.Handler {
 		// это упрощённый пример. В реальном приложении следует проверять все
 		// значения r.Header.Values("Accept-Encoding") и разбирать строку
 		// на составные части, чтобы избежать неожиданных результатов
+		fmt.Printf("r: %v\n", r)
+
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			// если gzip не поддерживается, передаём управление
 			// дальше без изменений
@@ -188,7 +190,6 @@ func gzipHandle(next http.Handler) http.Handler {
 			return
 		}
 
-		fmt.Printf("r: %v\n", r)
 		// создаём gzip.Writer поверх текущего w
 		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		if err != nil {
