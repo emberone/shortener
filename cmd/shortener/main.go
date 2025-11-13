@@ -113,7 +113,7 @@ func main() {
 	if a := os.Getenv("SERVER_ADDRESS"); a != "" {
 		server.a = a
 	}
-	if b := os.Getenv("SERVER_ADDRESS"); b != "" {
+	if b := os.Getenv("BASE_URL"); b != "" {
 		server.b = b
 	}
 	if f := os.Getenv("FILE_STORAGE_PATH"); f != "" {
