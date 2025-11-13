@@ -27,12 +27,10 @@ type response struct {
 	URL string `json:"result"`
 }
 type fileType struct {
-	Uuid         string `json:"uuid"`
-	Short_url    string `json:"short_url"`
-	Original_url string `json:"original_url"`
+	UUID        string `json:"UUID"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
-
-type fileSliceType []fileType
 
 var storage map[string]string = map[string]string{}
 
@@ -121,6 +119,8 @@ func main() {
 	if f := os.Getenv("FILE_STORAGE_PATH"); f != "" {
 		server.storage = f
 	}
+
+	fmt.Printf("os.Environ(): %v\n", os.Environ())
 
 	readFromFile()
 
@@ -264,7 +264,7 @@ func saveToFile(ft fileType) {
 	var mu sync.Mutex
 	mu.Lock()
 	//err = json.NewEncoder(f).Encode(ft)
-	fmt.Fprintf(f, `    {"uuid":"%s","short_url":"%s","original_url":"%s"},`+"\n]", ft.Uuid, ft.Short_url, ft.Original_url)
+	fmt.Fprintf(f, `    {"uuid":"%s","short_url":"%s","original_url":"%s"},`+"\n]", ft.UUID, ft.ShortURL, ft.OriginalURL)
 	mu.Unlock()
 
 }
@@ -289,17 +289,16 @@ func readFromFile() {
 	for i := range ss {
 
 		s := strings.TrimSpace(strings.ReplaceAll(ss[i], "},", "}"))
-		fmt.Printf("%v\n", s)
-
 		var ft fileType
 
 		err := json.Unmarshal([]byte(s), &ft)
-		fmt.Printf("err: %v\n", err)
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
+		}
 
-		storage[ft.Short_url] = ft.Original_url
+		storage[ft.ShortURL] = ft.OriginalURL
 
 	}
 
 	fmt.Printf("storage: %v\n", storage)
-
 }

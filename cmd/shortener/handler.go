@@ -86,9 +86,9 @@ func putLinkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ft := fileType{
-		Uuid:         uuid.New().String(),
-		Short_url:    link,
-		Original_url: string(bs),
+		UUID:        uuid.New().String(),
+		ShortURL:    link,
+		OriginalURL: string(bs),
 	}
 	saveToFile(ft)
 }
@@ -137,9 +137,9 @@ func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ft := fileType{
-		Uuid:         uuid.New().String(),
-		Short_url:    link,
-		Original_url: req.URL,
+		UUID:        uuid.New().String(),
+		ShortURL:    link,
+		OriginalURL: req.URL,
 	}
 	saveToFile(ft)
 
