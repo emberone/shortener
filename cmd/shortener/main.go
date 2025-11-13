@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,7 +16,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -125,6 +122,8 @@ func main() {
 		server.storage = f
 	}
 
+	readFromFile()
+
 	p, _ := url.Parse(server.b)
 	server.path = p.Path
 
@@ -226,145 +225,81 @@ func gzipHandle(next http.Handler) http.Handler {
 	})
 }
 
-func getLinkHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
+func saveToFile(ft fileType) {
 
-	if len(r.URL.Path) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	link := chi.URLParam(r, "linkid")
-
-	if storedURL, ok := storage[link]; ok && len(link) != 0 {
-		w.Header().Set("Location", storedURL)
-		w.WriteHeader(http.StatusTemporaryRedirect)
-		return
-	}
-
-	w.WriteHeader(http.StatusNotFound)
-}
-
-func putLinkHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mt != "text/plain" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	bs, err := io.ReadAll(r.Body)
+	_, err := os.Stat(server.storage)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if len(bs) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var link string
-	func() {
-		seed := rand.New(rand.NewSource(time.Now().UnixNano()))
-		charset := "abcdefghijklmnopqrstuvwxyz" +
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		b := make([]byte, 8)
-		for i := range b {
-			b[i] = charset[seed.Intn(len(charset))]
+		f, err := os.Create(server.storage)
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
 		}
-		link = string(b)
-	}()
+		defer f.Close()
 
-	var mu sync.RWMutex
-	mu.Lock()
-	storage[link] = string(bs)
-	mu.Unlock()
-
-	w.WriteHeader(http.StatusCreated)
-
-	switch server.path {
-	case "/":
-		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path, link)
-	default:
-		fmt.Fprintf(w, "%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
-	}
-}
-
-func putLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
+		f.Write([]byte("[\n]"))
 	}
 
-	mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mt != "application/json" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	f, err := os.OpenFile(server.storage, os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
 	}
-
-	var req request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var link string
-	func() {
-		seed := rand.New(rand.NewSource(time.Now().UnixNano()))
-		charset := "abcdefghijklmnopqrstuvwxyz" +
-			"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		b := make([]byte, 8)
-		for i := range b {
-			b[i] = charset[seed.Intn(len(charset))]
-		}
-		link = string(b)
-	}()
-
-	var mu sync.RWMutex
-	mu.Lock()
-	storage[link] = req.URL
-	mu.Unlock()
-
-	var resp response
-	switch server.path {
-	case "/":
-		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path, link)
-	default:
-		resp.URL = fmt.Sprintf("%s://%s%s%s", server.scheme, server.host, server.path+"/", link)
-	}
-
-	f, err := os.OpenFile(server.storage, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
-	fmt.Printf("err: %v\n", err)
-
 	defer f.Close()
 
-	ft := fileType{
-		Uuid:         uuid.New().String(),
-		Short_url:    link,
-		Original_url: resp.URL,
+	_, err = f.Seek(-1, io.SeekEnd)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
 	}
 
-	//var buf bytes.Buffer
+	var bs [1]byte
+	f.Read(bs[:])
 
-	var fst fileSliceType
+	stat, err := os.Stat(server.storage)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
 
-	fst = append(fst, ft)
-	err = json.NewEncoder(f).Encode(fst)
-	//bs, err := json.Marshal(&ft)
-	//fmt.Printf("bs: %v\n", bs)
-	fmt.Printf("err: %v\n", err)
+	if string(bs[0]) == "]" {
+		f.Truncate(stat.Size() - 1)
+	}
 
-	fmt.Printf("err: %v\n", err)
+	var mu sync.Mutex
+	mu.Lock()
+	//err = json.NewEncoder(f).Encode(ft)
+	fmt.Fprintf(f, `    {"uuid":"%s","short_url":"%s","original_url":"%s"},`+"\n]", ft.Uuid, ft.Short_url, ft.Original_url)
+	mu.Unlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(&resp)
+}
+
+func readFromFile() {
+
+	f, err := os.OpenFile(server.storage, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+		return
+	}
+
+	bs, err := io.ReadAll(f)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
+
+	bs = bs[1 : len(bs)-1]
+
+	ss := strings.Split(strings.TrimSpace(string(bs)), "\n")
+
+	for i := range ss {
+
+		s := strings.TrimSpace(strings.ReplaceAll(ss[i], "},", "}"))
+		fmt.Printf("%v\n", s)
+
+		var ft fileType
+
+		err := json.Unmarshal([]byte(s), &ft)
+		fmt.Printf("err: %v\n", err)
+
+		storage[ft.Short_url] = ft.Original_url
+
+	}
+
+	fmt.Printf("storage: %v\n", storage)
+
 }
