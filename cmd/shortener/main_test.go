@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"shortener/internal/handler"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +28,7 @@ func TestGetLinkHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// вызовем хендлер как обычную функцию, без запуска самого сервера
-			getLinkHandler(w, r)
+			handler.GetLinkHandler(w, r)
 
 			assert.Equal(t, tc.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
 		})
@@ -51,7 +53,7 @@ func TestPostLinkHandler(t *testing.T) {
 			r.Header.Set("Content-Type", "text/plain")
 			w := httptest.NewRecorder()
 
-			putLinkHandler(w, r)
+			handler.PutLinkHandler(w, r)
 
 			assert.Equal(t, tc.expectedCode, w.Code, "Код ответа не совпадает с ожидаемым")
 		})
