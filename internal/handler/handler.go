@@ -211,6 +211,11 @@ func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 	err = storage.Save(link, req.URL)
 	mu.Unlock()
 
+	if err != nil || mt != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	var resp response
 	switch config.Server.Path {
 	case "/":

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -14,8 +13,6 @@ import (
 	"shortener/internal/handler"
 	"shortener/internal/service"
 )
-
-var mu sync.RWMutex
 
 func main() {
 
