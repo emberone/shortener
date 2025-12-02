@@ -40,7 +40,8 @@ func Ping() bool {
 
 	dbConn := Open(config.Server.DSN)
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
 
 	if err := dbConn.PingContext(ctx); err != nil {
 		return true
