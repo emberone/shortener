@@ -10,18 +10,16 @@ import (
 	"mime"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"shortener/internal/config"
+	"shortener/internal/config/db"
 	"shortener/internal/service"
 	"shortener/internal/storage"
 )
-
-var mu sync.RWMutex
 
 type response struct {
 	URL string `json:"result"`
@@ -152,9 +150,7 @@ func PutLinkHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	mu.Lock()
 	err = storage.Save(link, string(bs))
-	mu.Unlock()
 
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
@@ -207,9 +203,12 @@ func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	mu.Lock()
 	err = storage.Save(link, req.URL)
-	mu.Unlock()
+
+	if err != nil || mt != "application/json" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	var resp response
 	switch config.Server.Path {
@@ -300,4 +299,19 @@ func GzipHandle(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func DBHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !db.Ping() {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 }
