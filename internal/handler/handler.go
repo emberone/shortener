@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"mime"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
