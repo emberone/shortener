@@ -150,8 +150,6 @@ func PutLinkHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	err = storage.Save(link, string(bs))
-
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 	}
@@ -170,7 +168,7 @@ func PutLinkHandler(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    link,
 		OriginalURL: string(bs),
 	}
-	service.SaveToFile(ft)
+	service.Save(ft)
 }
 
 func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
@@ -203,8 +201,6 @@ func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	err = storage.Save(link, req.URL)
-
 	if err != nil || mt != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -223,7 +219,8 @@ func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 		ShortURL:    link,
 		OriginalURL: req.URL,
 	}
-	service.SaveToFile(ft)
+
+	service.Save(ft)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

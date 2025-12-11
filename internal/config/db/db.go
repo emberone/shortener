@@ -42,7 +42,7 @@ func Ping() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
-	if err := DB.PingContext(ctx); err != nil {
+	if err := DB.PingContext(ctx); err == nil {
 		return true
 	}
 
