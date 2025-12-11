@@ -13,7 +13,7 @@ import (
 
 var DB *sql.DB
 
-func Open(driver, dsn string) {
+func Open(driver, dsn string) error {
 
 	var err error
 
@@ -22,14 +22,14 @@ func Open(driver, dsn string) {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err = DB.PingContext(ctx); err != nil {
 		fmt.Printf("err: %v\n", err)
 		panic(err)
 	}
 
-	fmt.Printf("err: %v\n", err)
+	return err
 
 }
 
@@ -39,7 +39,7 @@ func Save() {
 
 func Ping() bool {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	if err := DB.PingContext(ctx); err == nil {

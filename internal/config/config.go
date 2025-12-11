@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net/url"
 	"os"
+	"shortener/internal/config/db"
 
 	"go.uber.org/zap"
 )
@@ -40,6 +41,11 @@ func Configure() {
 	}
 	if d := os.Getenv("DATABASE_DSN"); d != "" {
 		Server.DSN = d
+
+	}
+
+	if Server.DSN != "" {
+		db.Open("pgx", Server.DSN)
 	}
 
 	p, _ := url.Parse(Server.B)

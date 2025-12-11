@@ -12,13 +12,6 @@ import (
 	"shortener/internal/service"
 )
 
-type video struct {
-	channel_title string
-	sum           int64
-	count         int64
-	avg           float64
-}
-
 func main() {
 
 	config.Configure()
