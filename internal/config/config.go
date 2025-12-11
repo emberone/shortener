@@ -47,6 +47,11 @@ func Configure() {
 
 	if Server.DSN != "" {
 		db.Open("pgx", Server.DSN)
+		err := db.Migrate()
+
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
+		}
 	}
 
 	p, _ := url.Parse(Server.B)
@@ -58,10 +63,4 @@ func Configure() {
 
 	Server.Host = p.Host
 	Server.Scheme = p.Scheme
-
-	err := db.Migrate()
-
-	if err != nil {
-		fmt.Printf("err: %v\n", err)
-	}
 }

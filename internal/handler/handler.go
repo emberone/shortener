@@ -150,10 +150,6 @@ func PutLinkHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	if err != nil {
-		fmt.Printf("err: %v\n", err)
-	}
-
 	w.WriteHeader(http.StatusCreated)
 
 	switch config.Server.Path {
