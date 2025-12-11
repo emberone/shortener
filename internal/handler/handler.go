@@ -201,7 +201,7 @@ func PutLinkAPIHandler(w http.ResponseWriter, r *http.Request) {
 		link = string(b)
 	}()
 
-	if err != nil || mt != "application/json" {
+	if mt != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
