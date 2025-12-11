@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"net/url"
 	"os"
 
@@ -22,12 +21,12 @@ var Server struct {
 }
 
 func Configure() {
-	var defaultDSN = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", "localhost", "postgres", `postgres`, "postgres")
+	//var defaultDSN = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", "localhost", "postgres", `postgres`, "postgres")
 
 	flag.StringVar(&Server.A, "a", "localhost:8080", "server address and port")
 	flag.StringVar(&Server.B, "b", "http://localhost:8080/", "server address and port")
-	flag.StringVar(&Server.Storage, "f", "storage.db", "storage")
-	flag.StringVar(&Server.DSN, "d", defaultDSN, "database service name")
+	flag.StringVar(&Server.Storage, "f", "", "storage")
+	flag.StringVar(&Server.DSN, "d", "", "database service name")
 	flag.Parse()
 
 	if a := os.Getenv("SERVER_ADDRESS"); a != "" {

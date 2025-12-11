@@ -19,6 +19,34 @@ type FileType struct {
 
 var mu sync.RWMutex
 
+func Save(ft FileType) {
+
+	if config.Server.DSN != "" {
+		SaveToDB(ft)
+		return
+	}
+
+	if config.Server.Storage != "" {
+		SaveToFile(ft)
+		return
+	}
+
+	SaveToMemory(ft)
+
+}
+
+func SaveToMemory(ft FileType) {
+	storage.Save(ft.ShortURL, ft.OriginalURL)
+
+}
+
+func SaveToDB(ft FileType) {
+
+}
+func ReadFromDB(ft FileType) {
+
+}
+
 func SaveToFile(ft FileType) {
 
 	_, err := os.Stat(config.Server.Storage)

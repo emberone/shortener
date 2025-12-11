@@ -8,19 +8,21 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	//_ "github.com/mattn/go-sqlite3"
-	_ "modernc.org/sqlite"
+	//_ "modernc.org/sqlite"
 )
 
 var DB *sql.DB
 
 func Open(driver, dsn string) {
 
-	DB, err := sql.Open(driver, dsn)
+	var err error
+
+	DB, err = sql.Open(driver, dsn)
 	if err != nil {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	if err = DB.PingContext(ctx); err != nil {
 		fmt.Printf("err: %v\n", err)
@@ -37,7 +39,7 @@ func Save() {
 
 func Ping() bool {
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
 	if err := DB.PingContext(ctx); err != nil {

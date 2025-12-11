@@ -3,31 +3,25 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
 	"shortener/internal/config"
-	"shortener/internal/config/db"
 	"shortener/internal/handler"
 	"shortener/internal/service"
 )
 
+type video struct {
+	channel_title string
+	sum           int64
+	count         int64
+	avg           float64
+}
+
 func main() {
 
 	config.Configure()
-
-	db.Open("sqlite", "videos.db")
-
-	db.Ping()
-
-	// row := db.DB.QueryRow("select version();")
-
-	// var res string
-	// row.Scan(&res)
-
-	os.Exit(0)
 
 	service.ReadFromFile()
 
