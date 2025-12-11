@@ -4,32 +4,31 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"shortener/internal/config"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/mattn/go-sqlite3"
 	_ "modernc.org/sqlite"
 )
 
-func Open(dsn string) *sql.DB {
+var DB *sql.DB
 
-	db, err := sql.Open("pgx", dsn)
+func Open(driver, dsn string) {
+
+	DB, err := sql.Open(driver, dsn)
 	if err != nil {
 		panic(err)
 	}
 
-	defer db.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err = db.PingContext(ctx); err != nil {
+	if err = DB.PingContext(ctx); err != nil {
+		fmt.Printf("err: %v\n", err)
 		panic(err)
 	}
 
 	fmt.Printf("err: %v\n", err)
 
-	return db
 }
 
 func Save() {
@@ -38,12 +37,10 @@ func Save() {
 
 func Ping() bool {
 
-	dbConn := Open(config.Server.DSN)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
-	if err := dbConn.PingContext(ctx); err != nil {
+	if err := DB.PingContext(ctx); err != nil {
 		return true
 	}
 
