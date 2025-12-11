@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
 	"shortener/internal/config/db"
@@ -57,4 +58,10 @@ func Configure() {
 
 	Server.Host = p.Host
 	Server.Scheme = p.Scheme
+
+	err := db.Migrate()
+
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
 }
