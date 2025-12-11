@@ -2,10 +2,8 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"net/url"
 	"os"
-	"strings"
 
 	"go.uber.org/zap"
 )
@@ -30,12 +28,6 @@ func Configure() {
 	flag.StringVar(&Server.Storage, "f", "", "storage")
 	flag.StringVar(&Server.DSN, "d", "", "database service name")
 	flag.Parse()
-
-	envs := os.Environ()
-	for _, e := range envs {
-		pair := strings.SplitN(e, "=", 2)
-		fmt.Printf("Key: %s, Value: %s\n", pair[0], pair[1])
-	}
 
 	if a := os.Getenv("SERVER_ADDRESS"); a != "" {
 		Server.A = a

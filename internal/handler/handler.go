@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -94,6 +95,13 @@ func (w *responseWriterWrapper) Write(b []byte) (int, error) {
 }
 
 func GetLinkHandler(w http.ResponseWriter, r *http.Request) {
+
+	envs := os.Environ()
+	for _, e := range envs {
+		pair := strings.SplitN(e, "=", 2)
+		fmt.Printf("Key: %s, Value: %s\n", pair[0], pair[1])
+	}
+
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
