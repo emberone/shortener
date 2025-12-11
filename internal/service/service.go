@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"shortener/internal/config"
+	"shortener/internal/config/db"
 	"shortener/internal/storage"
 	"strings"
 	"sync"
+	"time"
 )
 
 type FileType struct {
@@ -23,6 +25,7 @@ func Save(ft FileType) {
 
 	if config.Server.DSN != "" {
 		SaveToDB(ft)
+		SaveToMemory(ft)
 		return
 	}
 
@@ -42,7 +45,12 @@ func SaveToMemory(ft FileType) {
 }
 
 func SaveToDB(ft FileType) {
+	_, err := db.DB.Exec("INSERT INTO urls (id, short_url, original_url,created_at)"+
+		"VALUES ($1,$2,$3,$4);", ft.UUID, ft.ShortURL, ft.OriginalURL, time.Now().Format(time.RFC3339))
 
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
 }
 func ReadFromDB(ft FileType) {
 
