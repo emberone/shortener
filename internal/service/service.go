@@ -21,8 +21,6 @@ var mu sync.RWMutex
 
 func Save(ft FileType) {
 
-	fmt.Printf("config.Server: %v\n", config.Server)
-
 	if config.Server.DSN != "" {
 		SaveToDB(ft)
 		return
@@ -30,6 +28,7 @@ func Save(ft FileType) {
 
 	if config.Server.Storage != "" {
 		SaveToFile(ft)
+		SaveToMemory(ft)
 		return
 	}
 
