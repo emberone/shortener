@@ -17,7 +17,7 @@ func Migrate() error {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		"file:../../migrations",
+		"file:./migrations",
 		"postgres", driver)
 
 	fmt.Printf("err: %v\n", err)
